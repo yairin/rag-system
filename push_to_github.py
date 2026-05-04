@@ -28,6 +28,7 @@ FILES_TO_COMMIT = [
     "requirements.txt",
     ".gitignore",
     ".env.example",
+    ".python-version",
     ".streamlit/config.toml",
     "מדריך-פרסום.md",
 ]
@@ -189,5 +190,4 @@ def main():
     """)
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == 

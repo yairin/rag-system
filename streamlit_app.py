@@ -277,6 +277,11 @@ def main():
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"], avatar="🧑" if msg["role"] == "user" else "🤖"):
             st.markdown(msg["content"])
+            if msg["role"] == "assistant" and msg.get("kolzchut_url"):
+                st.info(
+                    f"📖 **מקור: כל זכות** — [{msg.get('kolzchut_title', 'כל זכות')}]({msg['kolzchut_url']})",
+                    icon="🌐",
+                )
             if msg["role"] == "assistant" and show_sources and "sources" in msg:
                 render_sources(msg["sources"])
             if msg["role"] == "assistant" and "tokens" in msg:
@@ -315,6 +320,13 @@ def _process_question(rag, question, top_k, min_score, show_sources, use_history
 
         st.markdown(response.answer)
 
+        # אם התשובה הגיעה מכל זכות — הצג קישור בולט
+        if getattr(response, "kolzchut_url", ""):
+            st.info(
+                f"📖 **מקור: כל זכות** — [{response.kolzchut_title}]({response.kolzchut_url})",
+                icon="🌐",
+            )
+
         if show_sources:
             render_sources(response.sources)
 
@@ -327,6 +339,8 @@ def _process_question(rag, question, top_k, min_score, show_sources, use_history
         "content": response.answer,
         "sources": response.sources,
         "tokens": response.tokens_used,
+        "kolzchut_url": getattr(response, "kolzchut_url", ""),
+        "kolzchut_title": getattr(response, "kolzchut_title", ""),
     })
     st.session_state.total_queries += 1
     st.session_state.total_tokens += response.tokens_used

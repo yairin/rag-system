@@ -85,6 +85,8 @@ class RAGResponse:
     answer: str
     sources: list[SearchResult]
     tokens_used: int = 0
+    kolzchut_url: str = ""    # URL ב-כל זכות אם השאלה נענתה משם
+    kolzchut_title: str = ""  # כותרת הדף ב-כל זכות
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -392,9 +394,19 @@ class ClaudeGenerator:
 כאשר אתה עונה:
 1. הסתמך **רק** על המידע שסופק בהקשר (Context).
 2. אם המידע אינו קיים בהקשר — אמור זאת בכנות.
-3. ציין את המקורות הרלוונטיים בסוף תשובתך.
-4. ענה בשפה שבה נשאלת השאלה.
-5. היה ממצה, מדויק ומועיל."""
+3. ענה בשפה שבה נשאלת השאלה (עברית אם השאלה בעברית).
+4. היה ממצה, מדויק ומועיל.
+
+בסוף **כל תשובה** הוסף חלק מקורות בפורמט המדויק הזה:
+
+---
+**📎 מקורות:**
+• **[שם קובץ, עמוד X]** — *"ציטוט ישיר וקצר מהמסמך שממנו נלקחה התשובה"*
+
+כללים לציטוט:
+- הציטוט חייב להיות מילים שמופיעות **כלשונן** בטקסט המקור (במרכאות)
+- אם יש מספר מקורות — ציין כל אחד בנפרד
+- אם המידע מגיע מאתר אינטרנט — כתוב את שם האתר בלבד (ה-URL יוצג בנפרד)"""
 
     def __init__(self, api_key: Optional[str] = None):
         key = api_key or os.getenv("ANTHROPIC_API_KEY")
@@ -457,6 +469,58 @@ class ClaudeGenerator:
 
     def clear_history(self):
         self.history.clear()
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# כל זכות — חיפוש ואחזור תוכן
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _search_kolzchut(query: str, max_results: int = 3) -> list[dict]:
+    """חיפוש באתר כל זכות. מחזיר רשימת {title, url, snippet}."""
+    import urllib.parse
+    q = urllib.parse.quote(query)
+    search_url = f"https://www.kolzchut.org.il/he/Special:Search?search={q}&ns0=1"
+    headers = {"User-Agent": "Mozilla/5.0 (RAG-Bot/1.0)"}
+    try:
+        resp = requests.get(search_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        results = []
+        for li in soup.select(".mw-search-result")[:max_results]:
+            a = li.find("a")
+            if not a:
+                continue
+            title = a.get_text(strip=True)
+            href = a.get("href", "")
+            if href.startswith("/"):
+                href = "https://www.kolzchut.org.il" + href
+            snippet_el = li.select_one(".searchresult")
+            snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+            results.append({"title": title, "url": href, "snippet": snippet})
+        return results
+    except Exception as e:
+        print(f"⚠️ שגיאה בחיפוש כל זכות: {e}")
+        return []
+
+
+def _fetch_kolzchut_page(url: str, max_chars: int = 4000) -> str:
+    """מושך את תוכן הטקסט של דף מכל זכות."""
+    headers = {"User-Agent": "Mozilla/5.0 (RAG-Bot/1.0)"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header",
+                         ".noprint", ".mw-editsection", ".mw-jump-link"]):
+            tag.decompose()
+        content = soup.find("div", {"id": "mw-content-text"})
+        text = content.get_text(separator="\n") if content else soup.get_text(separator="\n")
+        text = re.sub(r"\n{3,}", "\n\n", text).strip()
+        return text[:max_chars]
+    except Exception as e:
+        print(f"⚠️ שגיאה במשיכת דף כל זכות: {e}")
+        return ""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -542,10 +606,39 @@ class RAGSystem:
         results = [r for r in results if r.score >= min_score]
 
         if not results:
+            # Fallback: חיפוש באתר כל זכות
+            print(f"🔍 לא נמצא בבסיס הידע — מחפש ב-כל זכות: {question}")
+            kz_hits = _search_kolzchut(question)
+            if kz_hits:
+                top = kz_hits[0]
+                page_text = _fetch_kolzchut_page(top["url"])
+                if page_text:
+                    kz_chunk = SearchResult(
+                        text=page_text,
+                        source=f"כל זכות — {top['title']}",
+                        source_type="url",
+                        page=None,
+                        score=1.0,
+                    )
+                    answer, tokens = self.generator.generate(
+                        question=question,
+                        context_chunks=[kz_chunk],
+                        use_history=use_history,
+                    )
+                    return RAGResponse(
+                        question=question,
+                        answer=answer,
+                        sources=[kz_chunk],
+                        tokens_used=tokens,
+                        kolzchut_url=top["url"],
+                        kolzchut_title=top["title"],
+                    )
             return RAGResponse(
                 question=question,
-                answer="לא נמצא מידע רלוונטי בבסיס הידע. "
-                       "אנא טען מסמכים תחילה באמצעות `rag.ingest(...)`.",
+                answer=(
+                    "לא נמצא מידע רלוונטי במסמכים ולא באתר כל זכות.\n\n"
+                    "ניתן לחפש ישירות באתר [כל זכות](https://www.kolzchut.org.il)."
+                ),
                 sources=[],
             )
 

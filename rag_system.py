@@ -420,21 +420,19 @@ class ClaudeGenerator:
 
 כללי תשובה:
 1. **תן תשובה ישירה וברורה** — אל תתחיל ב"במקור מצוין" / "לפי מקור" / "לפי המסמך". פשוט ענה.
-2. נסח את התשובה בשפה טבעית ובהירה בעברית.
-3. הסתמך **אך ורק** על המידע שסופק בהקשר.
-4. אם המידע אינו מצוי בהקשר — אמור זאת בקצרה ובאדיבות.
-5. אם ישנם פרטים ספציפיים (תאריכים, אחוזים, סכומים) — ציין אותם במדויק.
+2. נסח בשפה טבעית ובהירה בעברית. אם יש פרטים ספציפיים (תאריכים, אחוזים, סכומים) — ציין אותם.
+3. הסתמך **אך ורק** על המידע שסופק.
 
-בסוף **כל תשובה** הוסף חלק ציטוטים בפורמט זה:
+חוק חשוב — שתי אפשרויות בלבד:
 
+**אפשרות א — יש מידע רלוונטי בהקשר:**
+ענה ישירות ובהיר, ובסוף הוסף:
 ---
 **📎 מקורות:**
-• **[שם הקובץ, עמוד X]** — *"ציטוט ישיר וקצר כלשונו מהמסמך"*
+• **[שם קובץ, עמוד X]** — *"ציטוט כלשונו מהמסמך"*
 
-כללי ציטוט:
-- הציטוט חייב להיות מילים שמופיעות בדיוק בטקסט (במרכאות)
-- ציין כל מקור בנפרד
-- אם המידע מגיע מאתר — כתוב את שם האתר (הקישור יוצג אוטומטית)"""
+**אפשרות ב — אין מידע רלוונטי בהקשר:**
+כתוב רק: "לא נמצא מידע על כך במסמכים הזמינים." — **ללא** חלק מקורות כלל."""
 
     def __init__(self, api_key: Optional[str] = None):
         key = api_key or os.getenv("ANTHROPIC_API_KEY")
@@ -675,6 +673,38 @@ class RAGSystem:
             context_chunks=results,
             use_history=use_history,
         )
+
+        # אם התשובה מציינת חוסר מידע — נסה כל זכות כ-fallback
+        no_info_phrases = [
+            "לא נמצא מידע", "אין מידע", "לא קיים בהקשר",
+            "אינם מכילים מידע", "המסמכים הזמינים",
+        ]
+        if any(p in answer for p in no_info_phrases):
+            kz_hits = _search_kolzchut(question)
+            if kz_hits:
+                top = kz_hits[0]
+                page_text = _fetch_kolzchut_page(top["url"])
+                if page_text:
+                    kz_chunk = SearchResult(
+                        text=page_text,
+                        source=f"כל זכות — {top['title']}",
+                        source_type="url",
+                        page=None,
+                        score=1.0,
+                    )
+                    answer2, tokens2 = self.generator.generate(
+                        question=question,
+                        context_chunks=[kz_chunk],
+                        use_history=False,
+                    )
+                    return RAGResponse(
+                        question=question,
+                        answer=answer2,
+                        sources=[kz_chunk],
+                        tokens_used=tokens + tokens2,
+                        kolzchut_url=top["url"],
+                        kolzchut_title=top["title"],
+                    )
 
         return RAGResponse(
             question=question,

@@ -4,7 +4,7 @@ rag_system.py — מערכת RAG (Retrieval-Augmented Generation) מעולה
 תומכת ב: PDF, DOCX, TXT, Markdown, URLs
 מודל שפה: Claude (Anthropic)
 מסד נתוני וקטורים: ChromaDB
-Embeddings: sentence-transformers (מקומי, ללא עלות API)
+Embeddings: chromadb DefaultEmbeddingFunction (onnxruntime, קל וללא PyTorch)
 """
 
 from __future__ import annotations
@@ -24,9 +24,9 @@ import requests
 from bs4 import BeautifulSoup
 
 # ── Embeddings & Vector DB ────────────────────────────────────────────────────
-from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.config import Settings
+from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 
 # ── LLM ──────────────────────────────────────────────────────────────────────
 import anthropic
@@ -267,28 +267,29 @@ class TextChunker:
 
 class VectorStore:
     """
-    עוטף את ChromaDB עם sentence-transformers לצורך embeddings מקומיים.
+    עוטף את ChromaDB עם DefaultEmbeddingFunction (onnxruntime — קל, ללא PyTorch).
     """
-    EMBED_MODEL = "all-MiniLM-L6-v2"   # מהיר, קל, תוצאות מצוינות
+    EMBED_MODEL = "all-MiniLM-L6-v2"
 
     def __init__(self, persist_dir: str = "./rag_db", collection: str = "documents"):
         self.persist_dir = persist_dir
         os.makedirs(persist_dir, exist_ok=True)
 
-        # טען מודל embeddings
+        # embedding function מובנית — משתמשת ב-onnxruntime, ללא torch
         print("⏳ טוען מודל embeddings...")
-        self.embedder = SentenceTransformer(self.EMBED_MODEL)
+        self.embed_fn = DefaultEmbeddingFunction()
 
         # ChromaDB עם שמירה לדיסק
         self.client = chromadb.PersistentClient(path=persist_dir)
         self.col = self.client.get_or_create_collection(
             name=collection,
+            embedding_function=self.embed_fn,
             metadata={"hnsw:space": "cosine"}
         )
         print(f"✅ Vector store מוכן ({self.col.count()} מסמכים שמורים)")
 
     def _embed(self, texts: list[str]) -> list[list[float]]:
-        return self.embedder.encode(texts, show_progress_bar=False).tolist()
+        return self.embed_fn(texts)
 
     def add_chunks(self, chunks: list[Chunk], batch_size: int = 64) -> int:
         """מוסיף chunks למסד הנתונים. מחזיר כמות שנוספו."""
@@ -304,7 +305,6 @@ class VectorStore:
                 continue
 
             texts = [c.text for c in new_batch]
-            embeddings = self._embed(texts)
             metadatas = [
                 {
                     "source": c.source,
@@ -317,7 +317,6 @@ class VectorStore:
 
             self.col.add(
                 ids=[c.doc_id for c in new_batch],
-                embeddings=embeddings,
                 documents=texts,
                 metadatas=metadatas,
             )
@@ -330,9 +329,8 @@ class VectorStore:
         if self.col.count() == 0:
             return []
 
-        query_embedding = self._embed([query])[0]
         results = self.col.query(
-            query_embeddings=[query_embedding],
+            query_texts=[query],
             n_results=min(k, self.col.count()),
             include=["documents", "metadatas", "distances"],
         )

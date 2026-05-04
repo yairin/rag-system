@@ -22,8 +22,3 @@ desktop.ini
 
 # ─── rag_db נבנה אוטומטית ב-Streamlit Cloud — לא צריך להעלות ───────────────
 rag_db/
-
-# ─── סקריפטי פרסום עם credentials — לא להעלות! ────────────────────────────
-DEPLOY_NOW.bat
-SETUP.bat
-PUSH_TO_GITHUB.bat

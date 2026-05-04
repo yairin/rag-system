@@ -1,0 +1,22 @@
+[theme]
+# ─── ערכת צבעים ─────────────────────────────────────────────────────────────
+primaryColor       = "#4a6cf7"
+backgroundColor    = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+textColor          = "#1e293b"
+font               = "sans serif"
+
+[server]
+# ─── הגדרות שרת ──────────────────────────────────────────────────────────────
+headless          = true
+enableCORS        = false
+enableXsrfProtection = true
+maxUploadSize     = 200
+
+[browser]
+# ─── הגדרות דפדפן ────────────────────────────────────────────────────────────
+gatherUsageStats  = false
+
+[runner]
+# ─── ביצועים ─────────────────────────────────────────────────────────────────
+fastReruns        = true

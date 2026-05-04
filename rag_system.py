@@ -749,4 +749,11 @@ class RAGSystem:
         print("🗑️  היסטוריית השיחה נוקתה.")
 
     def stats(self) -> dict:
-        """סטטיסטי
+        """סטטיסטיקות על המערכת"""
+        return {
+            "total_chunks": self.vector_store.col.count(),
+            "sources": self.list_sources(),
+            "history_turns": len(self.generator.history) // 2,
+            "embed_model": self.vector_store.EMBED_MODEL,
+            "llm_model": self.generator.MODEL,
+        }

@@ -24,9 +24,16 @@ import requests
 from bs4 import BeautifulSoup
 
 # ── Embeddings & Vector DB ────────────────────────────────────────────────────
-# Force pure-Python protobuf backend — avoids C-extension failure on Python 3.14
-import os as _os
-_os.environ.setdefault('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION', 'python')
+# chromadb imports opentelemetry-grpc at module load time, which fails on Python 3.14
+# (protobuf C-extension incompatibility). Stub out the problematic modules first.
+import sys as _sys
+from unittest.mock import MagicMock as _Mock
+for _mod in [
+    'opentelemetry.exporter.otlp.proto.grpc',
+    'opentelemetry.exporter.otlp.proto.grpc.trace_exporter',
+    'opentelemetry.exporter.otlp.proto.grpc.exporter',
+]:
+    _sys.modules.setdefault(_mod, _Mock())
 
 import chromadb
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction

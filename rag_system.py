@@ -25,7 +25,6 @@ from bs4 import BeautifulSoup
 
 # ── Embeddings & Vector DB ────────────────────────────────────────────────────
 import chromadb
-from chromadb.config import Settings
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 
 # ── LLM ──────────────────────────────────────────────────────────────────────

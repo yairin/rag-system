@@ -7,6 +7,8 @@ streamlit_app.py — ממשק Web לשאלות ותשובות על מסמכי מ
 
 import os
 from pathlib import Path
+import logging
+logging.basicConfig(level=logging.WARNING)
 # Force pure-Python protobuf — avoids C-extension crash on Python 3.14
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 import streamlit as st
@@ -299,6 +301,17 @@ def main():
 
 def _process_question(rag, question, top_k, min_score, show_sources, use_history):
     """מעבד שאלה ומציג תשובה."""
+    # ── בדיקת אבטחה ──────────────────────────────────────────────────────────
+    try:
+        from security import sanitize_input, validate_question
+        question = sanitize_input(question)
+        is_valid, err_msg = validate_question(question)
+        if not is_valid:
+            st.warning(err_msg)
+            return
+    except ImportError:
+        pass  # security.py לא זמין — המשך ללא בדיקה
+
     # הצג שאלת משתמש
     with st.chat_message("user", avatar="🧑"):
         st.markdown(question)

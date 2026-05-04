@@ -446,7 +446,10 @@ class ClaudeGenerator:
 • **[שם קובץ, עמוד X]** — *"ציטוט כלשונו"*
 
 **אפשרות ב — אין מידע רלוונטי:**
-כתוב רק: "לא נמצא מידע על כך במסמכים הזמינים." — **ללא** חלק מקורות וללא הפניה למסמכים."""
+כתוב רק: "לא נמצא מידע על כך במקורות הזמינים." — **ללא** חלק מקורות כלל.
+
+כאשר המקור הוא אתר כל זכות — כלול את הקישור ישירות בציטוט:
+• **[כותרת הדף](URL)** — *"ציטוט כלשונו מהאתר"*"""
 
     def __init__(self, api_key: Optional[str] = None):
         key = api_key or os.getenv("ANTHROPIC_API_KEY")
@@ -650,9 +653,10 @@ class RAGSystem:
                 top = kz_hits[0]
                 page_text = _fetch_kolzchut_page(top["url"])
                 if page_text:
+                    kz_link = f"[{top['title']}]({top['url']})"
                     kz_chunk = SearchResult(
                         text=page_text,
-                        source=f"כל זכות — {top['title']}",
+                        source=f"כל זכות — {kz_link}",
                         source_type="url",
                         page=None,
                         score=1.0,
@@ -672,12 +676,7 @@ class RAGSystem:
                     )
             return RAGResponse(
                 question=question,
-                answer=(
-                    "לא נמצא מידע על כך במקורות הזמינים.
-
-"
-                    "לחיפוש נוסף, ניתן לעיין באתר [כל זכות](https://www.kolzchut.org.il)."
-                ),
+                answer="לא נמצא מידע על כך במקורות הזמינים.",
                 sources=[],
             )
 

@@ -188,28 +188,22 @@ class DocumentLoader:
 
     @staticmethod
     def _fix_pdf_word_per_line(text: str) -> str:
-        """מתקן PDF שחולץ עם מילה לשורה — מחבר שורות קצרות לפסקאות"""
+        """
+        מתקן PDF שחולץ עם מילה לשורה ותווים הפוכים (RTL artifact).
+        בעיה: כל מילה בשורה נפרדת, שורות ריקות/רווח מפרידות ביניהן,
+              וכל תווי המילה הפוכים (כיוון RTL).
+        פתרון: אוסף את כל הטוקנים הלא-ריקים, מהפך כל אחד, מאחד לטקסט.
+        """
         lines = [l.strip() for l in text.split("\n")]
         non_empty = [l for l in lines if l]
         if not non_empty:
             return text
         avg_len = sum(len(l) for l in non_empty) / len(non_empty)
-        if avg_len >= 20:          # טקסט תקין — אל תגע בו
+        if avg_len >= 20:
             return text
-        # מיזוג: שורות רצופות מחוברות ברווח; שורה ריקה = הפרדת פסקה
-        merged: list[str] = []
-        para: list[str] = []
-        for line in lines:
-            if not line:
-                if para:
-                    merged.append(" ".join(para))
-                    para = []
-                merged.append("")
-            else:
-                para.append(line)
-        if para:
-            merged.append(" ".join(para))
-        return "\n".join(merged)
+        # אסוף טוקנים, הפוך כל אחד (תיקון RTL), חבר לטקסט
+        tokens = [l[::-1] for l in non_empty]
+        return " ".join(tokens)
 
     @staticmethod
     def _clean(text: str) -> str:

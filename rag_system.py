@@ -103,6 +103,7 @@ class DocumentLoader:
             reader = pypdf.PdfReader(f)
             for page_num, page in enumerate(reader.pages, start=1):
                 text = page.extract_text() or ""
+                text = self._fix_pdf_word_per_line(text)
                 text = self._clean(text)
                 if text.strip():
                     chunks.append(Chunk(
@@ -179,10 +180,35 @@ class DocumentLoader:
             raise ValueError(f"סוג קובץ לא נתמך: {ext}")
 
     @staticmethod
+    def _fix_pdf_word_per_line(text: str) -> str:
+        """מתקן PDF שחולץ עם מילה לשורה — מחבר שורות קצרות לפסקאות"""
+        lines = [l.strip() for l in text.split("\n")]
+        non_empty = [l for l in lines if l]
+        if not non_empty:
+            return text
+        avg_len = sum(len(l) for l in non_empty) / len(non_empty)
+        if avg_len >= 20:          # טקסט תקין — אל תגע בו
+            return text
+        # מיזוג: שורות רצופות מחוברות ברווח; שורה ריקה = הפרדת פסקה
+        merged: list[str] = []
+        para: list[str] = []
+        for line in lines:
+            if not line:
+                if para:
+                    merged.append(" ".join(para))
+                    para = []
+                merged.append("")
+            else:
+                para.append(line)
+        if para:
+            merged.append(" ".join(para))
+        return "\n".join(merged)
+
+    @staticmethod
     def _clean(text: str) -> str:
         """ניקוי בסיסי של טקסט"""
-        text = re.sub(r"\n{3,}", "\n\n", text)      # הסר שורות ריקות עודפות
-        text = re.sub(r"[ \t]{2,}", " ", text)        # הסר רווחים עודפים
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r"[ \t]{2,}", " ", text)
         text = text.strip()
         return text
 
@@ -390,23 +416,25 @@ class ClaudeGenerator:
     """
     MODEL = "claude-sonnet-4-6"
 
-    SYSTEM_PROMPT = """אתה עוזר AI אינטליגנטי שמשתמש במידע מהמסמכים שסופקו לו.
-כאשר אתה עונה:
-1. הסתמך **רק** על המידע שסופק בהקשר (Context).
-2. אם המידע אינו קיים בהקשר — אמור זאת בכנות.
-3. ענה בשפה שבה נשאלת השאלה (עברית אם השאלה בעברית).
-4. היה ממצה, מדויק ומועיל.
+    SYSTEM_PROMPT = """אתה עוזר מידע מדויק ומועיל בתחום דיני עבודה ומשאבי אנוש.
 
-בסוף **כל תשובה** הוסף חלק מקורות בפורמט המדויק הזה:
+כללי תשובה:
+1. **תן תשובה ישירה וברורה** — אל תתחיל ב"במקור מצוין" / "לפי מקור" / "לפי המסמך". פשוט ענה.
+2. נסח את התשובה בשפה טבעית ובהירה בעברית.
+3. הסתמך **אך ורק** על המידע שסופק בהקשר.
+4. אם המידע אינו מצוי בהקשר — אמור זאת בקצרה ובאדיבות.
+5. אם ישנם פרטים ספציפיים (תאריכים, אחוזים, סכומים) — ציין אותם במדויק.
+
+בסוף **כל תשובה** הוסף חלק ציטוטים בפורמט זה:
 
 ---
 **📎 מקורות:**
-• **[שם קובץ, עמוד X]** — *"ציטוט ישיר וקצר מהמסמך שממנו נלקחה התשובה"*
+• **[שם הקובץ, עמוד X]** — *"ציטוט ישיר וקצר כלשונו מהמסמך"*
 
-כללים לציטוט:
-- הציטוט חייב להיות מילים שמופיעות **כלשונן** בטקסט המקור (במרכאות)
-- אם יש מספר מקורות — ציין כל אחד בנפרד
-- אם המידע מגיע מאתר אינטרנט — כתוב את שם האתר בלבד (ה-URL יוצג בנפרד)"""
+כללי ציטוט:
+- הציטוט חייב להיות מילים שמופיעות בדיוק בטקסט (במרכאות)
+- ציין כל מקור בנפרד
+- אם המידע מגיע מאתר — כתוב את שם האתר (הקישור יוצג אוטומטית)"""
 
     def __init__(self, api_key: Optional[str] = None):
         key = api_key or os.getenv("ANTHROPIC_API_KEY")

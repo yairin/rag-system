@@ -6,6 +6,7 @@ streamlit_app.py — ממשק Web לשאלות ותשובות על מסמכי מ
 """
 
 import os
+from pathlib import Path
 # Force pure-Python protobuf — avoids C-extension crash on Python 3.14
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 import streamlit as st
@@ -232,6 +233,19 @@ def render_sources(sources):
 def main():
     init_session()
     rag = load_rag_system()
+
+    # ── בנה DB אוטומטי בהרצה ראשונה ──────────────────────────────────────────
+    if rag.vector_store.col.count() == 0:
+        docs_dir = Path("docs")
+        if docs_dir.exists() and any(docs_dir.rglob("*.pdf")):
+            with st.spinner("🔨 בונה בסיס ידע מהמסמכים... (כ-2 דקות בהרצה ראשונה)"):
+                total = rag.ingest_directory(str(docs_dir))
+            st.success(f"✅ בסיס הידע נבנה! נטענו {total} קטעי ידע.")
+            st.rerun()
+        else:
+            st.error("❌ תיקיית docs/ לא נמצאה. ודא שה-PDFs קיימים ב-docs/")
+            st.stop()
+
     top_k, min_score, show_sources, use_history = render_sidebar(rag)
 
     # ── כותרת ─────────────────────────────────────────────────────────────────

@@ -6,6 +6,8 @@ streamlit_app.py — ממשק Web לשאלות ותשובות על מסמכי מ
 """
 
 import os
+# Force pure-Python protobuf — avoids C-extension crash on Python 3.14
+os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 import streamlit as st
 
 # ── הגדרת עמוד — חייב להיות ראשון ──────────────────────────────────────────

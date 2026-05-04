@@ -24,6 +24,10 @@ import requests
 from bs4 import BeautifulSoup
 
 # ── Embeddings & Vector DB ────────────────────────────────────────────────────
+# Force pure-Python protobuf backend — avoids C-extension failure on Python 3.14
+import os as _os
+_os.environ.setdefault('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION', 'python')
+
 import chromadb
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 

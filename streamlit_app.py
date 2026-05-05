@@ -154,7 +154,7 @@ def render_sidebar(rag):
 
         top_k = st.slider(
             "כמות קטעים לחיפוש",
-            min_value=2, max_value=10, value=5,
+            min_value=3, max_value=20, value=12,
             help="כמה קטעי מסמך לשלוף עבור כל שאלה"
         )
 

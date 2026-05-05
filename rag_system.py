@@ -224,7 +224,7 @@ class TextChunker:
     משתמש בגישה של פיצול לפי משפטים / פסקאות לחתיכות נקיות.
     """
 
-    def __init__(self, chunk_size: int = 600, overlap: int = 80):
+    def __init__(self, chunk_size: int = 1000, overlap: int = 80):
         self.chunk_size = chunk_size
         self.overlap = overlap
 
@@ -589,9 +589,9 @@ class RAGSystem:
         self,
         persist_dir: str = "./rag_db",
         collection: str = "documents",
-        chunk_size: int = 600,
-        chunk_overlap: int = 80,
-        top_k: int = 5,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+        top_k: int = 12,
         api_key: Optional[str] = None,
     ):
         self.top_k = top_k
